@@ -1,5 +1,4 @@
-#dist: trusty
-
+dist: trusty
 language: cpp
 sudo: false
 compiler:
