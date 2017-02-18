@@ -8,10 +8,17 @@ compiler:
 os:
     - linux
 
+before_script:
+    - mkdir build
+    - cd build
+    - cmake ..
+
+script:
+    - make
+    - make test
+
 install:
     - if [ "$CXX" = "g++" ]; then export CXX="g++" CC="gcc"; fi
     - if [ "$CXX" = "clang++" ]; then export CXX="clang++" CC="clang"; fi
 
-script:
-  - cmake --build
-  - ./bin/foo
+
