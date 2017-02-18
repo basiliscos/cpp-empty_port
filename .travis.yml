@@ -1,8 +1,17 @@
+#dist: trusty
+
 language: cpp
 sudo: false
-#dist: trusty
 compiler:
-- clang
-- gcc
+    - clang
+    - gcc
 os:
-- linux
+    - linux
+
+install:
+    - if [ "$CXX" = "g++" ]; then export CXX="g++" CC="gcc"; fi
+    - if [ "$CXX" = "clang++" ]; then export CXX="clang++" CC="clang"; fi
+
+script:
+  - cmake --build
+  - ./bin/foo
