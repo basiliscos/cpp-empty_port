@@ -16,6 +16,9 @@
 #include <cstring>
 #include <cstdlib>
 #include <stdexcept>
+#include <random>
+#include <chrono>
+#include <thread>
 
 namespace empty_port {
 
@@ -26,6 +29,8 @@ namespace empty_port {
 
     using socket_t = int;
     using port_t = uint16_t;
+    using duration_t = std::chrono::milliseconds;
+    static constexpr duration_t SLEEP_DELAY(10);
 
     static constexpr port_t MIN_PORT = 49152;
     static constexpr port_t MAX_PORT = 65535;
@@ -74,9 +79,11 @@ namespace empty_port {
         }
 
         static port_t get_random_impl(const char* host) {
-            static constexpr port_t delta = (MAX_PORT - MIN_PORT) >> 2;
+            std::random_device rd;
+            std::mt19937 rng(rd());
+            std::uniform_int_distribution<port_t> uni(MIN_PORT, MAX_PORT);
 
-            port_t some_port = MIN_PORT + (int(std::rand() * delta)) % delta;
+            port_t some_port = uni(rng);
             while (some_port < MAX_PORT) {
                 if (check_port_impl(some_port, host)) {
                     return some_port;
@@ -86,6 +93,18 @@ namespace empty_port {
             throw std::runtime_error("Cannot get random port");
         }
 
+        static bool wait_port_impl(const port_t port, const char* host, duration_t max_wait_ms) {
+            duration_t waited(0);
+            while( waited < max_wait_ms) {
+                if (!check_port_impl(port, host)) {
+                    return true;
+                }
+                std::this_thread::sleep_for(SLEEP_DELAY);
+                waited += SLEEP_DELAY;
+            }
+
+            return false;
+        }
     };
 
     template<Kind T>
@@ -97,5 +116,13 @@ namespace empty_port {
     port_t get_random(const char* host = "127.0.0.1") {
         return impl<T>::get_random_impl(host);
     }
+
+    template<Kind T>
+    bool wait_port(const port_t port, const char* host = "127.0.0.1",
+        duration_t max_wait_ms = duration_t(500))
+    {
+        return impl<T>::wait_port_impl(port, host, max_wait_ms);
+    }
+
 
 };
