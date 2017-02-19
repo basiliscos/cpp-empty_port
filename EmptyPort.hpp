@@ -40,6 +40,11 @@ template <Kind> struct impl;
 
 template <> struct impl<TCP> {
 
+    static bool can_listen(const port_t port, const char *host);
+
+    static void fill_struct(const socket_t &socket, sockaddr_in &addr,
+                            const port_t port, const char *host);
+
     static bool check_port_impl(const port_t port, const char *host);
 
     static port_t get_random_impl(const char *host);
@@ -69,7 +74,9 @@ inline port_t impl<TCP>::get_random_impl(const char *host) {
 
     port_t some_port = uni(rng);
     while (some_port < MAX_PORT) {
-        if (impl<TCP>::check_port_impl(some_port, host)) {
+        bool is_empty = impl<TCP>::check_port_impl(some_port, host) &&
+                        impl<TCP>::can_listen(some_port, host);
+        if (is_empty) {
             return some_port;
         }
         some_port++;
@@ -77,16 +84,11 @@ inline port_t impl<TCP>::get_random_impl(const char *host) {
     throw std::runtime_error("Cannot get random port");
 }
 
-inline bool impl<TCP>::check_port_impl(const port_t port, const char *host) {
-    socket_t s = socket(AF_INET, SOCK_STREAM, 0);
-    if (s == -1) {
-        throw std::runtime_error("Cannot get random port:: socket");
-        return false;
-    }
-    sockaddr_in remote_addr;
-    std::memset(&remote_addr, 0, sizeof(remote_addr));
-    remote_addr.sin_family = AF_INET;
-    remote_addr.sin_port = htons(port);
+inline void impl<TCP>::fill_struct(const socket_t &socket, sockaddr_in &addr,
+                                   const port_t port, const char *host) {
+    std::memset(&addr, 0, sizeof(addr));
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(port);
 
     struct addrinfo hints, *result = NULL;
     std::memset(&hints, 0, sizeof(hints));
@@ -94,23 +96,58 @@ inline bool impl<TCP>::check_port_impl(const port_t port, const char *host) {
     hints.ai_socktype = SOCK_STREAM;
 
     struct sockaddr_in *host_addr;
-
     // looks up IPv4/IPv6 address by host name or stringized IP address
-    if (getaddrinfo(host, NULL, &hints, &result)) {
-        throw std::runtime_error("Cannot get random port:: getaddrinfo");
-        goto FAIL;
+    int r = getaddrinfo(host, NULL, &hints, &result);
+    if (r) {
+        throw std::runtime_error(std::string("Cannot getaddrinfo:: ") +
+                                 strerror(r));
     }
     host_addr = (struct sockaddr_in *)result->ai_addr;
-    memcpy(&remote_addr.sin_addr, &host_addr->sin_addr, sizeof(struct in_addr));
+    memcpy(&addr.sin_addr, &host_addr->sin_addr, sizeof(struct in_addr));
     freeaddrinfo(result);
+}
+
+inline bool impl<TCP>::can_listen(const port_t port, const char *host) {
+    socket_t s = socket(AF_INET, SOCK_STREAM, 0);
+    if (s == -1) {
+        throw std::runtime_error("Cannot get random port:: socket");
+    }
+    sockaddr_in addr;
+    fill_struct(s, addr, port, host);
+
+    if (bind(s, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
+        goto FAIL;
+    }
+    if (listen(s, 1)) {
+        goto FAIL;
+    }
+
+    /* success */
+    CLOSE_SOCKET(s);
+    return true;
+FAIL:
+    CLOSE_SOCKET(s);
+    return false;
+}
+
+inline bool impl<TCP>::check_port_impl(const port_t port, const char *host) {
+    socket_t s = socket(AF_INET, SOCK_STREAM, 0);
+    if (s == -1) {
+        throw std::runtime_error("Cannot get random port:: socket");
+    }
+    sockaddr_in remote_addr;
+
+    fill_struct(s, remote_addr, port, host);
 
     if ((connect(s, (struct sockaddr *)&remote_addr, sizeof(remote_addr)))) {
-        CLOSE_SOCKET(s);
-        return true;
+        goto SUCCESS;
     } else {
         goto FAIL;
     }
 
+SUCCESS:
+    CLOSE_SOCKET(s);
+    return true;
 FAIL:
     CLOSE_SOCKET(s);
     return false;
