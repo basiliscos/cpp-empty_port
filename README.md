@@ -36,7 +36,8 @@ uint16_t get_random(const char *host = "127.0.0.1");
 
 /* waits until up to max_wait_ms before porta will be occupied. 
 Retruns true if it is, otherwise returns false */
-<Kind T = Kind::TCP, typename D = std::chrono::milliseconds>
+<
+T = Kind::TCP, typename D = std::chrono::milliseconds>
 bool wait_port(const port_t port, const char *host = "127.0.0.1", D max_wait = D(500))
 ```
 
@@ -51,13 +52,13 @@ namespace ts = test_server;
 
 ...;
 
-uint16_t port = ep::get_random<ep::Kind::TCP>();
+uint16_t port = ep::get_random();
 LOG_DEBUG("Using port :" << port);
 
 auto port_str = boost::lexical_cast<std::string>(port);
 auto server = ts::make_server({"redis-server", "--port", port_str});
-ep::wait_port<ep::Kind::TCP>(port);
-
+ep::wait_port(port);
+/* now it is possible to send requests for redis */
 
 ```
 
