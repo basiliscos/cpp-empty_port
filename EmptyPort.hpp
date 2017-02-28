@@ -154,16 +154,17 @@ FAIL:
 }
 
 /* public interface */
-template <Kind T>
+template <Kind T = Kind::TCP>
 inline bool check_port(const port_t port, const char *host = "127.0.0.1") {
     return impl<T>::check_port_impl(port, host);
 }
 
-template <Kind T> inline port_t get_random(const char *host = "127.0.0.1") {
+template <Kind T = Kind::TCP>
+inline port_t get_random(const char *host = "127.0.0.1") {
     return impl<T>::get_random_impl(host);
 }
 
-template <Kind T>
+template <Kind T = Kind::TCP>
 inline bool wait_port(const port_t port, const char *host = "127.0.0.1",
                       duration_t max_wait_ms = duration_t(500)) {
     return impl<T>::wait_port_impl(port, host, max_wait_ms);

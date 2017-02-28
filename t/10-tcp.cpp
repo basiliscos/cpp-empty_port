@@ -4,7 +4,6 @@
 #include "catch.hpp"
 
 namespace ep = empty_port;
-constexpr ep::Kind TCP = ep::Kind::TCP;
 
 static bool initialised = false;
 
@@ -22,10 +21,10 @@ static void initialise() {
 
 TEST_CASE("single port", "[tcp]") {
     initialise();
-    auto port = ep::get_random<TCP>();
+    auto port = ep::get_random();
     REQUIRE(port > 0);
-    REQUIRE(ep::check_port<TCP>(port));
-    REQUIRE(!ep::wait_port<TCP>(port));
+    REQUIRE(ep::check_port(port));
+    REQUIRE(!ep::wait_port(port));
 
     auto s = socket(AF_INET, SOCK_STREAM, 0);
     if (s < 0) {
@@ -44,15 +43,15 @@ TEST_CASE("single port", "[tcp]") {
     }
     listen(s, 5);
 
-    REQUIRE(!ep::check_port<TCP>(port));
-    REQUIRE(ep::wait_port<TCP>(port));
+    REQUIRE(!ep::check_port(port));
+    REQUIRE(ep::wait_port(port));
 }
 
 TEST_CASE("10 random empty ports", "[tcp]") {
     static constexpr size_t COUNT = 10;
     ep::port_t ports[COUNT] = {0};
     for (auto i = 0; i < COUNT; i++) {
-        ports[i] = ep::get_random<TCP>();
+        ports[i] = ep::get_random();
         REQUIRE(ports[i] > 0);
     }
     // check for uniqueness
