@@ -36,6 +36,7 @@ uint16_t get_random(const char *host = "127.0.0.1");
 
 /* waits until up to max_wait_ms before porta will be occupied. 
 Retruns true if it is, otherwise returns false */
-bool wait_port(const port_t port, const char *host = "127.0.0.1", duration_t max_wait_ms = duration_t(500))
+<Kind T = Kind::TCP, typename D = std::chrono::milliseconds>
+bool wait_port(const port_t port, const char *host = "127.0.0.1", D max_wait = D(500))
 ```
 
