@@ -23,3 +23,19 @@ TEST_CASE("..." ) {
     ep::wait_port(port);
 }    
 ```
+
+# API
+
+```cpp
+
+/* retrun true if port is ready for usage */
+bool check_port(const port_t port, const char *host = "127.0.0.1");
+
+/* returns first available empty port or throws exception */
+uint16_t get_random(const char *host = "127.0.0.1");
+
+/* waits until up to max_wait_ms before porta will be occupied. 
+Retruns true if it is, otherwise returns false */
+bool wait_port(const port_t port, const char *host = "127.0.0.1", duration_t max_wait_ms = duration_t(500))
+```
+
