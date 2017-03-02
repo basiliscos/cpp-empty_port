@@ -29,9 +29,23 @@ enum Kind { TCP, UDP };
 
 using socket_t = SOCKET_TYPE;
 using port_t = uint16_t;
-using duration_t = std::chrono::milliseconds;
 using clock_t = std::chrono::high_resolution_clock;
-static constexpr duration_t SLEEP_DELAY(10);
+
+class SocketHolder {
+    socket_t socket_;
+
+  public:
+    SocketHolder(socket_t s) : socket_(s) {
+        if (s == -1) {
+            throw std::runtime_error("Cannot get socket");
+        }
+    }
+    ~SocketHolder() { CLOSE_SOCKET(socket_); }
+    socket_t &socket() { return socket_; }
+};
+
+// using duration_t = std::chrono::milliseconds;
+// static constexpr duration_t SLEEP_DELAY(10);
 
 static constexpr port_t MIN_PORT = 49152;
 static constexpr port_t MAX_PORT = 65535;
@@ -49,19 +63,20 @@ template <> struct impl<TCP> {
 
     static port_t get_random_impl(const char *host);
 
-    static bool wait_port_impl(const port_t port, const char *host,
-                               duration_t max_wait_ms);
+    template <typename D>
+    static bool wait_port_impl(const port_t port, const char *host, D max_wait);
 };
 
 /* TCP impl */
+template <typename D>
 inline bool impl<TCP>::wait_port_impl(const port_t port, const char *host,
-                                      duration_t max_wait_ms) {
-    auto stop_at = clock_t::now() + max_wait_ms;
+                                      D max_wait) {
+    auto stop_at = clock_t::now() + max_wait;
     do {
         if (!impl<TCP>::check_port_impl(port, host)) {
             return true;
         }
-        std::this_thread::sleep_for(SLEEP_DELAY);
+        std::this_thread::sleep_for(D(1));
     } while (clock_t::now() < stop_at);
 
     return false;
@@ -108,49 +123,33 @@ inline void impl<TCP>::fill_struct(const socket_t &socket, sockaddr_in &addr,
 }
 
 inline bool impl<TCP>::can_listen(const port_t port, const char *host) {
-    socket_t s = socket(AF_INET, SOCK_STREAM, 0);
-    if (s == -1) {
-        throw std::runtime_error("Cannot get random port:: socket");
-    }
+    SocketHolder sh(socket(AF_INET, SOCK_STREAM, 0));
     sockaddr_in addr;
-    fill_struct(s, addr, port, host);
+    fill_struct(sh.socket(), addr, port, host);
 
-    if (bind(s, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
-        goto FAIL;
+    if (bind(sh.socket(), (struct sockaddr *)&addr, sizeof(addr)) < 0) {
+        return false;
     }
-    if (listen(s, 1)) {
-        goto FAIL;
+    if (listen(sh.socket(), 1)) {
+        return false;
     }
 
     /* success */
-    CLOSE_SOCKET(s);
     return true;
-FAIL:
-    CLOSE_SOCKET(s);
-    return false;
 }
 
 inline bool impl<TCP>::check_port_impl(const port_t port, const char *host) {
-    socket_t s = socket(AF_INET, SOCK_STREAM, 0);
-    if (s == -1) {
-        throw std::runtime_error("Cannot get random port:: socket");
-    }
+    SocketHolder sh(socket(AF_INET, SOCK_STREAM, 0));
     sockaddr_in remote_addr;
 
-    fill_struct(s, remote_addr, port, host);
+    fill_struct(sh.socket(), remote_addr, port, host);
 
-    if ((connect(s, (struct sockaddr *)&remote_addr, sizeof(remote_addr)))) {
-        goto SUCCESS;
+    if ((connect(sh.socket(), (struct sockaddr *)&remote_addr,
+                 sizeof(remote_addr)))) {
+        return true;
     } else {
-        goto FAIL;
+        return false;
     }
-
-SUCCESS:
-    CLOSE_SOCKET(s);
-    return true;
-FAIL:
-    CLOSE_SOCKET(s);
-    return false;
 }
 
 /* public interface */
@@ -164,9 +163,9 @@ inline port_t get_random(const char *host = "127.0.0.1") {
     return impl<T>::get_random_impl(host);
 }
 
-template <Kind T = Kind::TCP>
+template <Kind T = Kind::TCP, typename D = std::chrono::milliseconds>
 inline bool wait_port(const port_t port, const char *host = "127.0.0.1",
-                      duration_t max_wait_ms = duration_t(500)) {
-    return impl<T>::wait_port_impl(port, host, max_wait_ms);
+                      D max_wait = D(500)) {
+    return impl<T>::template wait_port_impl<D>(port, host, max_wait);
 }
 };
